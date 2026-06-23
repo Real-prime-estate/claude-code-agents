@@ -1,7 +1,7 @@
 {
   "name": "claude-code-agents",
-  "description": "멀티 에이전트 토론 시스템(think-deep/design-think) + 언어별 코드 실행 에이전트(executors) + 프로젝트 분석 파이프라인",
-  "version": "1.1.0",
+  "description": "멀티 에이전트 토론 시스템(think-deep) + 멀티-AI 협업 오케스트레이션(multi-ai-debate) + 언어별 코드 실행 에이전트(executors)",
+  "version": "2.0.0",
   "author": {
     "name": "kms",
     "url": "https://github.com/Real-prime-estate"

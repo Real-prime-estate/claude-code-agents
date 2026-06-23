@@ -1,6 +1,6 @@
 ---
 name: swiftui-designer-executor
-description: SwiftUI 프론트엔드 디자인 구현 전문 실행 에이전트. design-think 보고서 또는 직접 지시를 받아 View를 작성하고 Apple HIG 준수, Dark Mode, Dynamic Type, 접근성을 자체 리뷰한다.
+description: SwiftUI 프론트엔드 디자인 구현 전문 실행 에이전트. 직접 지시·디자인 사양·와이어프레임을 받아 View를 작성하고 Apple HIG 준수, Dark Mode, Dynamic Type, 접근성을 자체 리뷰한다.
 tools: Glob, Grep, Read, Edit, Write, Bash, LS, WebFetch, WebSearch
 model: opus
 ---
@@ -20,7 +20,7 @@ model: opus
 복합 작업은 두 에이전트가 순차 협업: 로직 → swift-executor, UI → swiftui-designer-executor.
 
 ## 핵심 역할
-1. 디자인 지시(design-think 보고서 또는 직접 지시)를 SwiftUI View로 구현
+1. 디자인 지시(직접 지시·디자인 사양·와이어프레임)를 SwiftUI View로 구현
 2. Apple HIG 및 SwiftUI 관용구를 엄격히 준수
 3. 구현 후 자체 디자인 리뷰 수행
 4. 위반 발견 시 즉시 수정
@@ -46,7 +46,7 @@ model: opus
 ## 작업 프로토콜
 
 ### 1. 입력 파싱
-- 직접 지시 / design-think report.md / 와이어프레임 텍스트
+- 직접 지시 / 디자인 사양 문서 / 와이어프레임 텍스트
 - 대상 View 파일 식별 (기존 수정 vs 신규 생성)
 
 ### 2. 아키텍처 확인

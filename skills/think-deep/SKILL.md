@@ -73,17 +73,11 @@ metadata:
 
 ### Phase 0: 준비
 
-1. 토론 디렉토리를 생성한다:
-   ```
-   Bash: mkdir -p ~/Agents/debates/$(date +%Y-%m-%d_%H%M%S)/round-1
-   ```
-   생성된 경로를 `DEBATE_DIR`로 기억한다.
-
-2. 플러그인 디렉토리를 찾는다:
-   ```
-   Bash: find ~/.claude/plugins/cache -path "*/claude-code-agents/*/prompts/orchestrator.md" -type f 2>/dev/null | head -1 | xargs dirname | xargs dirname
-   ```
-   찾은 경로를 `PLUGIN_DIR`로 기억한다. 찾지 못하면 `~/.claude/plugins/cache` 아래에서 `agents/*/prompts/orchestrator.md`로 재탐색한다.
+토론 디렉토리를 생성한다:
+```
+Bash: mkdir -p ~/Agents/debates/$(date +%Y-%m-%d_%H%M%S)/round-1
+```
+생성된 경로를 `DEBATE_DIR`로 기억한다.
 
 ### Phase 1: 라운드 1 (병렬 실행)
 
@@ -91,7 +85,7 @@ Agent 도구로 3개의 서브에이전트를 **동시에** 실행한다. `subag
 
 ```
 Agent(
-  subagent_type="agents:researcher",
+  subagent_type="think-deep-researcher",
   description="연구 에이전트 라운드 1",
   prompt="
     ## 토론 질문
@@ -112,9 +106,9 @@ Agent(
 ```
 
 3개 Agent를 **병렬로** 실행:
-- Agent(subagent_type="agents:researcher", description="연구 에이전트 라운드 1", ...)
-- Agent(subagent_type="agents:logician", description="논리 에이전트 라운드 1", ...)
-- Agent(subagent_type="agents:creative-critic", description="창의비판 에이전트 라운드 1", ...)
+- Agent(subagent_type="think-deep-researcher", description="연구 에이전트 라운드 1", ...)
+- Agent(subagent_type="think-deep-logician", description="논리 에이전트 라운드 1", ...)
+- Agent(subagent_type="think-deep-critic", description="창의비판 에이전트 라운드 1", ...)
 
 ### Phase 2: 수렴 확인
 
@@ -123,7 +117,7 @@ Agent(
 1. 각 에이전트의 출력 파일을 읽는다:
    - Read: `{DEBATE_DIR}/round-1/researcher.md`
    - Read: `{DEBATE_DIR}/round-1/logician.md`
-   - Read: `{DEBATE_DIR}/round-1/creative-critic.md`
+   - Read: `{DEBATE_DIR}/round-1/critic.md`
 
 2. **조기 종료 판단**: 3개 에이전트의 핵심 결론이 실질적으로 동일하면 → Phase 4로 직행
 
@@ -142,7 +136,7 @@ Agent(
 
 ```
 Agent(
-  subagent_type="agents:researcher",
+  subagent_type="think-deep-researcher",
   description="연구 에이전트 라운드 {N}",
   prompt="
     ## 토론 질문
@@ -189,16 +183,13 @@ Agent(
 
 ### Phase 4: 최종 답변 생성
 
-1. 오케스트레이터 프로토콜을 읽는다:
-   - Read: `{PLUGIN_DIR}/prompts/orchestrator.md`
+마지막 라운드의 3개 에이전트 출력을 다음 5단계로 취합한다:
 
-2. **오케스트레이터 프로토콜에 따라** 마지막 라운드의 3개 에이전트 출력을 취합한다:
-
-   - 1단계: 합의 지도 작성 (만장일치/다수/논쟁/철회 분류)
-   - 2단계: 확신도 가중 평가 (가장 낮은 확신도의 근거를 우선 검토)
-   - 3단계: 충돌 조율 (사실→연구, 논리→논리, 프레임→창의 우선)
-   - 4단계: 우선순위 결정 (합의도 × 확신도 × ROI)
-   - 5단계: 최종 답변 구성 (합의 권고 + 논쟁 항목 + 철회 + 핵심 통찰)
+1. **합의 지도 작성**: 각 논점을 만장일치 / 다수 / 논쟁 / 철회 로 분류
+2. **확신도 가중 평가**: 가장 낮은 확신도의 근거를 우선 검토. 확신도 ≥7 이면 강한 권고, 5~6 은 조건부, ≤4 는 미해결로 표시
+3. **충돌 조율**: 사실 충돌은 researcher 우선, 논리 충돌은 logician 우선, 프레임 충돌은 critic 우선
+4. **우선순위 결정**: 합의도 × 확신도 × ROI 로 권고 순서 정렬
+5. **최종 답변 구성**: ① 합의 권고 (만장일치+다수) ② 논쟁 항목 (양측 입장 병기) ③ 철회된 의견 (왜 폐기) ④ 핵심 통찰 (3개 에이전트가 공통으로 짚은 통찰)
 
 3. `--verbose` 옵션이 있으면 모든 라운드의 토론 내용을 접을 수 있는 형태로 포함:
 

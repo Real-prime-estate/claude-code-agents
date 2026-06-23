@@ -14,10 +14,10 @@ model: opus
 2. 작성한 코드가 코딩 컨벤션을 준수하는지 자체 리뷰한다
 3. 리뷰에서 위반을 발견하면 즉시 수정한다
 
-## 코딩 컨벤션 핵심 규칙 (상위 10개)
+## 코딩 컨벤션 핵심 규칙 (상위 12개)
 1. C11 표준 (`-std=c11`)
-2. 변수/함수: `snake_case`, 매크로/상수: `UPPER_SNAKE_CASE`
-3. 공개 심볼에 모듈명 접두사 필수 (예: `hash_map_init`)
+2. 변수/함수: `snake_case`, 매크로/상수: `UPPER_SNAKE_CASE`, opaque 타입: `snake_case_t`
+3. 공개 심볼에 모듈명 접두사 필수 (예: `hash_map_init`, `image_t`)
 4. 포인터 `*`는 변수 쪽에 붙임 (`int *p`)
 5. 전역 `g_`, 정적 `s_`, 출력 파라미터 `out_` 접두사
 6. opaque 타입만 typedef, 나머지는 `struct tag` 직접 사용
@@ -25,6 +25,8 @@ model: opus
 8. 탭 들여쓰기 (Linux kernel 스타일)
 9. `goto cleanup` 패턴으로 리소스 정리
 10. 매직 넘버 금지 — 매크로/enum으로 정의
+11. K&R 분리 함수 정의 — 반환형 별도 줄
+12. `<stdint.h>` 제한적 사용 — wire/binary/픽셀 등 너비가 의미 있는 곳에만
 
 ## 상세 컨벤션
 반드시 Read: `/Users/kms/.claude/projects/-Users-kms/memory/coding-conventions/c.md`
@@ -38,12 +40,15 @@ model: opus
 6. 결과 보고
 
 ## 자체 리뷰 체크리스트
-- [ ] snake_case 네이밍 + 모듈 접두사
+- [ ] snake_case 네이밍 + 모듈 접두사 (타입은 `snake_case_t`)
 - [ ] 포인터 `*` 변수 쪽 부착
 - [ ] 전역/정적/출력 접두사 (g_, s_, out_)
+- [ ] K&R 분리 함수 정의 (반환형 별도 줄)
+- [ ] `/* */` 다중 줄 주석/박스 헤더 없음 (`//` 단일 줄만)
+- [ ] `<stdint.h>` 사용 시 wire/binary/픽셀 맥락인지 확인
 - [ ] goto cleanup 리소스 정리 (malloc/fopen 사용 시)
 - [ ] 매직 넘버 없음
-- [ ] 함수 길이 40줄 이내 (초과 시 분리 검토)
+- [ ] 단일 책임 원칙 — 함수가 한 가지만 하는지 (줄 수 카운트 금지)
 - [ ] UB 없음 — 배열 경계, null 역참조, 정수 오버플로우
 - [ ] 프로젝트 기존 패턴과 일관성
 

@@ -33,6 +33,7 @@ metadata:
 | subagent_type | 대상 | 모델 | 주요 용도 |
 |---------------|------|------|----------|
 | `agents:c-executor` | C 코드 | opus | 일반 C |
+| `agents:cpp-executor` | C++ 코드 | opus | 일반 C++ (C++20, Core Guidelines) |
 | `agents:ts-executor` | TypeScript 코드 | opus | 일반 TS |
 | `agents:py-executor` | Python 코드 | opus | 일반 Python |
 | `agents:swift-executor` | Swift 코드 (비-View) | opus | 모델, 로직, 서비스 |
@@ -44,7 +45,7 @@ metadata:
 사용자 입력: `$ARGUMENTS`
 
 옵션:
-- `--lang <언어>`: 언어 명시 (c, ts, py, swift, swiftui, kotlin)
+- `--lang <언어>`: 언어 명시 (c, cpp, ts, py, swift, swiftui, kotlin)
 - `--from-debate <경로>`: think-deep 또는 design-think report.md에서 권고 구현
 - `--review-only`: 코드 수정 없이 컨벤션 리뷰만
 - 나머지: 코딩 지시
@@ -56,16 +57,28 @@ metadata:
 1. **`--lang` 명시**:
    - `swift` → 일반 Swift (swift-executor)
    - `swiftui` → SwiftUI View (swiftui-designer-executor)
+   - `c` → C (c-executor)
+   - `cpp` → C++ (cpp-executor)
    - 기타 → 해당 executor
 
 2. **명시 없으면 작업 디렉토리 스캔**:
    ```
-   Makefile, CMakeLists.txt → C
+   Makefile (C 소스만)         → C
+   *.cpp/.cc/.cxx/.hpp/.hh/.hxx → C++
+   *.c/.h 단독 (C++ 확장자 없음) → C
+   CMakeLists.txt              → 내용 확인 (project(... CXX) 또는 LANGUAGES CXX이면 C++,
+                                  LANGUAGES C 단독이면 C, 둘 다면 소스 확장자 다수결)
    package.json, tsconfig.json → TypeScript
-   pyproject.toml, uv.lock → Python
-   Package.swift, *.xcodeproj → Swift 프로젝트
-   build.gradle.kts → Kotlin
+   pyproject.toml, uv.lock     → Python
+   Package.swift, *.xcodeproj  → Swift 프로젝트
+   build.gradle.kts            → Kotlin
    ```
+
+   **C vs C++ 판정 우선순위**:
+   1. 대상 파일이 명시되어 있으면 그 파일의 확장자로 결정 (`.cpp`/`.cc`/`.cxx`/`.hpp`/`.hh`/`.hxx`/`.c++` → C++, `.c` → C)
+   2. `.h`만 있고 어느 쪽인지 모호하면 같은 모듈의 동명 `.c`/`.cpp` 존재 여부로 판단
+   3. CMakeLists.txt의 `project(... LANGUAGES ...)` 또는 `enable_language()`로 판단
+   4. 그래도 불분명하면 사용자에게 질문
 
 3. **Swift 프로젝트인 경우 추가 판단**:
    - 지시가 **View 레이어**에 관한 것이면 → `swiftui-designer-executor`

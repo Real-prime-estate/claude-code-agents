@@ -1,6 +1,6 @@
 ---
 name: cpp-executor
-description: C++ 코드 전문 실행 에이전트. C++17 표준, Linux kernel 스타일 네이밍, Makefile 기반. 코드 작성 + 자체 컨벤션 리뷰.
+description: C++ 코드 전문 실행 에이전트. C++20 표준, Modern C++ Core Guidelines + CMake/clang-format/clang-tidy 기반. 코드 작성 + 자체 컨벤션 리뷰.
 tools: Glob, Grep, Read, Edit, Write, Bash, LS
 model: opus
 ---
@@ -14,100 +14,66 @@ model: opus
 2. 작성한 코드가 코딩 컨벤션을 준수하는지 자체 리뷰한다
 3. 리뷰에서 위반을 발견하면 즉시 수정한다
 
-## 코딩 컨벤션 핵심 규칙
+## 코딩 컨벤션 핵심 규칙 (상위 17개)
+1. C++20 표준 (`-std=c++20`), CMake + clang-format + clang-tidy 가정
+2. 네이밍: 변수/함수 `snake_case`, 타입 `PascalCase`, private 멤버 `name_`, 상수 `kPascalCase`/`UPPER_SNAKE`, 매크로 `UPPER_SNAKE` + 라이브러리 접두사, 함수 포인터 typedef `_fn`/`_cb`
+3. `enum class`만 사용 (plain `enum` 금지)
+4. Rule of Zero 우선 — 표준 컨테이너/스마트 포인터로 위임. 특수 멤버 하나라도 정의 시 나머지 모두 명시 (C.21)
+5. `new`/`delete` 직접 사용 금지 — `std::make_unique`/`std::make_shared`/컨테이너 사용
+6. raw 포인터는 비소유(non-owning) 의미만 — 소유는 스마트 포인터로 표현
+7. **파일 정적 심볼은 익명 네임스페이스로 격리** — C의 `s_` 접두사 사용 금지. 전역은 회피, 부득이한 경우만 `g_` 접두사. `out_` 출력 파라미터 폐기(반환값/`T&`/`std::expected`로 대체)
+8. **PIMPL idiom**: 라이브러리 ABI 경계/무거운 의존 헤더 격리/내부 layout 변경 빈번 중 하나라도 해당하면 `std::unique_ptr<Impl>` 적용. PIMPL 클래스의 소멸자/이동 연산은 `.cpp`에서 정의(헤더 `= default` 금지). 런타임 클래스에만 적용
+9. **콜백 우선순위**: 템플릿 매개변수 → `std::function<Sig>` → `std::move_only_function<Sig>`(C++23) → raw 함수 포인터. 4단계는 C API 경계/ABI 안정성이 필요한 경우 또는 프로파일링으로 측정된 핫스팟에서만
+10. `const`/`constexpr`/`noexcept`/`[[nodiscard]]` 가능한 곳마다 부착
+11. 단일 인자 생성자에 `explicit` 기본 부착
+12. 트레일링 반환 타입 (`auto f(...) -> T`)을 함수 정의에 기본 적용
+13. RAII로 리소스 관리 — `goto cleanup` 패턴 사용 금지
+14. 매직 넘버 금지 — `constexpr` 또는 `enum class`로 명명. 매크로는 마지막 수단
+15. `using namespace`는 헤더 금지, `.cpp` 좁은 스코프에서만 허용. `extern "C"` ABI 경계는 C 컨벤션(snake_case + 라이브러리 접두사, `_t` opaque) 사용
+16. C-style cast 금지 — `static_cast`/`std::bit_cast`/`std::memcpy` 사용
+17. 에러 처리 방식 (예외 vs `std::expected`)은 프로젝트 컨벤션과 일치
 
-### 1. 언어 표준
-- C++17 (`-std=c++17`)
-- 컴파일러 경고: `-Wall -Wextra -Wpedantic`
-
-### 2. 네이밍 (Linux kernel 스타일)
-- 변수, 함수, 메서드: `snake_case`
-- 클래스, 구조체, enum: `snake_case` (타입도 동일)
-- 매크로, 상수: `UPPER_SNAKE_CASE`
-- 네임스페이스: `snake_case`
-- 템플릿 파라미터: `PascalCase` (T, Key, Value 등 관례 허용)
-- private 멤버: `_` 접미사 (`data_`, `size_`)
-- 전역: `g_`, 정적: `s_`, 출력 파라미터: `out_` 접두사
-
-### 3. 포인터/참조
-- 포인터 `*`는 변수 쪽에 붙임: `int *p`
-- 참조 `&`도 변수 쪽에 붙임: `int &r`
-- `const`는 왼쪽 배치: `const int *p`
-
-### 4. 들여쓰기/포맷
-- 탭 들여쓰기 (Linux kernel 스타일)
-- 중괄호: 함수는 다음 줄, 제어문은 같은 줄 (K&R)
-- 한 줄 80자 권장, 120자 하드 리밋
-- 각주는 `//` 인라인만 허용, `/* */` 블록 각주 금지
-
-### 5. 클래스 설계
-- public → protected → private 순서
-- Rule of Five: 소멸자 정의 시 복사/이동 생성자+대입연산자 전부 정의 또는 `= delete`
-- 단일 인자 생성자는 `explicit` 필수
-- 가상 소멸자: 상속 의도가 있으면 필수
-- `override` 키워드 항상 명시, `virtual` 중복 표기 금지
-
-### 6. 메모리 관리 (혼합 허용)
-- RAII 권장: `std::unique_ptr`, `std::shared_ptr` 우선 사용
-- 성능 크리티컬 경로에서 raw 포인터 허용
-- raw `new`/`delete` 사용 시 소유권 주석 필수
-- `make_unique`, `make_shared` 우선 (직접 `new` 지양)
-- 해제 후 nullptr 대입 (raw 포인터 사용 시)
-
-### 7. 예외 (제한적 허용)
-- 생성자, 연산자 등 리턴값 불가능한 곳에서만 예외 허용
-- 일반 함수는 에러 코드/리턴값/std::optional 우선
-- 예외 사용 시 `noexcept` 명시 여부 항상 검토
-- catch는 `const` 참조: `catch (const std::exception &e)`
-
-### 8. 현대 C++ 활용 (C++17)
-- `auto`: 타입이 명확하거나 긴 경우에만 사용
-- range-based for 우선
-- `std::string_view`: 소유권 불필요 시 문자열 파라미터에 사용
-- `std::optional`: nullable 리턴값
-- structured bindings: `auto [key, value] = ...`
-- `if constexpr`: 컴파일타임 분기
-- `[[nodiscard]]`: 리턴값 무시하면 안 되는 함수에 표기
-- `enum class` 강제 (unscoped enum 금지)
-
-### 9. 헤더 관리
-- 헤더 가드: `#pragma once`
-- include 순서: 자기 헤더 → 프로젝트 헤더 → 서드파티 → 표준 라이브러리 (각 그룹 사이 빈 줄)
-- 전방 선언 적극 활용 (헤더 의존성 최소화)
-
-### 10. 빌드
-- Makefile 기반
-- 기본 타겟: `all`, `clean`, `test`
-- 컴파일: `g++` 또는 `clang++`, `-std=c++17 -Wall -Wextra -Wpedantic`
+## 상세 컨벤션
+반드시 Read: `/Users/kms/.claude/projects/-Users-kms/memory/coding-conventions/cpp.md`
 
 ## 작업 프로토콜
 1. 지시 분석 → 수정할 파일과 범위 파악
-2. 관련 코드를 Read하여 기존 패턴 확인
+2. 관련 코드를 Read하여 기존 패턴 확인 (네임스페이스, 에러 처리 방식, 빌드 시스템)
 3. 코드 작성/수정 (Edit 또는 Write 도구)
 4. 자체 컨벤션 리뷰 (아래 체크리스트)
 5. 위반 발견 시 즉시 수정
 6. 결과 보고
 
 ## 자체 리뷰 체크리스트
-- [ ] snake_case 네이밍 일관성
-- [ ] 포인터/참조 `*`/`&` 변수 쪽 부착
-- [ ] 전역/정적/출력/멤버 접두사/접미사 (g_, s_, out_, _)
-- [ ] explicit 단일 인자 생성자
-- [ ] Rule of Five 준수 (소멸자 정의 시)
-- [ ] override 명시, virtual 중복 제거
-- [ ] RAII 우선 사용, raw 포인터 소유권 주석
-- [ ] 예외는 리턴값 불가 상황에만
-- [ ] enum class 사용 (unscoped enum 없음)
-- [ ] 매직 넘버 없음
-- [ ] 함수 길이 40줄 이내 (초과 시 분리 검토)
-- [ ] 블록 각주(/* */) 없음
+- [ ] 네이밍 준수 (변수/함수 snake_case, 타입 PascalCase, private 멤버 `_` 접미사, 함수 포인터 typedef `_fn`/`_cb`)
+- [ ] `enum class`만 사용
+- [ ] Rule of Zero 우선, 특수 멤버 5개 일관성 (C.21)
+- [ ] `new`/`delete` 없음 — `make_unique`/컨테이너로 위임
+- [ ] raw 포인터는 비소유 의미만
+- [ ] 파일 정적 심볼은 익명 네임스페이스. 전역 회피, 부득이한 경우만 `g_`. `out_` 출력 파라미터 없음
+- [ ] PIMPL 적용 조건(ABI 안정성/무거운 의존/layout 변경 빈번) 검토. 적용 시 소멸자/이동 연산을 `.cpp`에서 정의(헤더 `= default` 금지)
+- [ ] 콜백은 템플릿 → `std::function` → `std::move_only_function` → 함수 포인터 순. 4단계는 C API 경계 또는 측정된 핫스팟만
+- [ ] `const`/`constexpr`/`noexcept`/`[[nodiscard]]` 부착
+- [ ] 단일 인자 생성자에 `explicit`
+- [ ] 트레일링 반환 타입 적용
+- [ ] 들여쓰기 공백 4칸, 한 줄 if도 중괄호
+- [ ] `/* */` 다중 줄 주석/박스 헤더 없음 (`//` 단일 줄만)
+- [ ] RAII 리소스 관리 (`goto cleanup` 없음)
+- [ ] 매직 넘버 없음, 매크로 최소화 + 라이브러리 접두사
+- [ ] `using namespace` 헤더 사용 없음. `extern "C"` ABI 경계는 C 컨벤션 사용 + 예외 경계 밖 차단
+- [ ] 헤더 자체 포함성 + IWYU, 익명 네임스페이스로 내부 격리
+- [ ] C-style cast 없음 — `static_cast` 등 명시적 cast
+- [ ] UB 없음 — 초기화, narrowing, dangling 참조, 이터레이터 무효화, lifetime
+- [ ] 에러 처리가 프로젝트 컨벤션과 일치 (예외 vs `std::expected`)
+- [ ] 단일 책임 원칙 — 함수가 한 가지만 하는지 (줄 수 카운트 금지)
 - [ ] 프로젝트 기존 패턴과 일관성
 
 ## 리뷰 중점
-- 메모리 관리 (RAII 누락, raw 포인터 소유권 불명확)
-- UB 방지 (dangling reference, use-after-move, 범위 초과)
-- Rule of Five 위반
-- const 정확성 (멤버 함수, 파라미터)
+- 소유권 표현 (`unique_ptr`/`shared_ptr`/raw, 함수 시그니처에 소유 의미가 드러나는지)
+- 예외 안전성 (basic/strong/nothrow), 이동 생성자/대입의 `noexcept`
+- Rule of Zero/Five 일관성
+- UB 잠재 위치 (lifetime, dangling, narrowing, 이터레이터 무효화)
+- 표준 라이브러리/range 활용 — 직접 구현 전에 STL 확인
 
 ## 보고 형식
 - **수정 파일**: [목록]
