@@ -27,12 +27,11 @@
 **코드 실행 에이전트:**
 - `c-executor` — C11, Linux kernel 스타일
 - `cpp-executor` — C++20, Core Guidelines, CMake/clang-format/clang-tidy
-- `ts-executor` — TypeScript strict, 보수적 안전성 컨벤션
+- `ts-executor` — TypeScript strict, 보수적 안전성 컨벤션 (순수 TS/라이브러리)
 - `next-react-executor` — Next.js App Router / React / TSX, strict TypeScript, ESLint
 - `py-executor` — Python 3.12+, mypy strict, Ruff, uv
 - `swift-executor` — Swift 6.0+, Apple API Design Guidelines, Concurrency
 - `swiftui-designer-executor` — SwiftUI View, HIG, Dark Mode, Dynamic Type, 접근성
-- `kotlin-executor` — Kotlin, coroutines, ktlint
 
 ## 메모리 (memory/)
 
@@ -70,7 +69,7 @@ claude /plugin install --from-github Real-prime-estate/claude-code-agents
 ```
 .claude-plugin/
   plugin.json          # 플러그인 메타데이터
-agents/                # 에이전트 정의 (11개)
+agents/                # 에이전트 정의 (10개)
 skills/                # 스킬 정의 (3개: code, think-deep, multi-ai-debate)
 memory/
   MEMORY.md            # 메모리 인덱스

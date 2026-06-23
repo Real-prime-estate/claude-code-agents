@@ -34,18 +34,18 @@ metadata:
 |---------------|------|------|----------|
 | `agents:c-executor` | C 코드 | opus | 일반 C |
 | `agents:cpp-executor` | C++ 코드 | opus | 일반 C++ (C++20, Core Guidelines) |
-| `agents:ts-executor` | TypeScript 코드 | opus | 일반 TS |
+| `agents:ts-executor` | TypeScript 코드 (순수/라이브러리) | opus | 런타임 독립 TS, SDK, 도메인 로직 |
+| `agents:next-react-executor` | Next.js/React/TSX | opus | App Router, component, hooks, UI state |
 | `agents:py-executor` | Python 코드 | opus | 일반 Python |
 | `agents:swift-executor` | Swift 코드 (비-View) | opus | 모델, 로직, 서비스 |
 | `agents:swiftui-designer-executor` | SwiftUI View | opus | View, 레이아웃, 스타일, 애니메이션 |
-| `agents:kotlin-executor` | Kotlin 코드 | opus | 일반 Kotlin |
 
 ## 인자 파싱
 
 사용자 입력: `$ARGUMENTS`
 
 옵션:
-- `--lang <언어>`: 언어 명시 (c, cpp, ts, py, swift, swiftui, kotlin)
+- `--lang <언어>`: 언어 명시 (c, cpp, ts, next-react, py, swift, swiftui)
 - `--from-debate <경로>`: think-deep 또는 design-think report.md에서 권고 구현
 - `--review-only`: 코드 수정 없이 컨벤션 리뷰만
 - 나머지: 코딩 지시
@@ -68,10 +68,10 @@ metadata:
    *.c/.h 단독 (C++ 확장자 없음) → C
    CMakeLists.txt              → 내용 확인 (project(... CXX) 또는 LANGUAGES CXX이면 C++,
                                   LANGUAGES C 단독이면 C, 둘 다면 소스 확장자 다수결)
-   package.json, tsconfig.json → TypeScript
+   next.config.*, app/·pages/ + react 의존성, *.tsx → Next.js/React (next-react-executor)
+   package.json, tsconfig.json (순수 TS) → TypeScript (ts-executor)
    pyproject.toml, uv.lock     → Python
    Package.swift, *.xcodeproj  → Swift 프로젝트
-   build.gradle.kts            → Kotlin
    ```
 
    **C vs C++ 판정 우선순위**:
@@ -88,9 +88,17 @@ metadata:
    - 불분명하면 → 대상 파일을 Read하여 `View` 프로토콜 준수 여부로 판단
    - 여전히 불분명하면 → 사용자에게 질문
 
-4. **복수 언어 감지** → 지시 내용으로 해당 언어 선택. 불분명하면 질문
+4. **TypeScript 프로젝트인 경우 추가 판단**:
+   - **Next.js/React/TSX, UI component, page/layout, browser API** 코드면 → `next-react-executor`
+     - 힌트: "컴포넌트", "페이지", "화면", "App Router", "hook", "라우트", `*.tsx`
+   - **런타임 독립 라이브러리/SDK/도메인 로직** (순수 TS) 이면 → `ts-executor`
+     - 힌트: "라이브러리", "SDK", "파서", "도메인 로직", "유틸"
+   - 두 영역이 섞이면 → UI boundary는 `next-react-executor`, core logic은 `ts-executor`
+   - 불분명하면 → 사용자에게 질문
 
-5. **감지 실패** → 사용자에게 질문
+5. **복수 언어 감지** → 지시 내용으로 해당 언어 선택. 불분명하면 질문
+
+6. **감지 실패** → 사용자에게 질문
 
 ### Phase 1: report.md 연동 (선택)
 
