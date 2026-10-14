@@ -22,16 +22,24 @@ esac
 extract_verdict() {
   awk '
   function clean(s){ gsub(/[#>*_`]/,"",s); gsub(/^[ \t]+|[ \t]+$/,"",s); return tolower(s) }
-  # verdict 토큰이 라인 단독이거나 라인 맨 앞(뒤에 공백/콜론/하이픈/대시-설명)인 경우 인식.
+  # verdict 토큰이 라인 맨 앞이고 뒤가 영문자/하이픈이 아닌 경우(공백·콜론·마침표·한글 조사·줄끝) 인식.
   # 긴 토큰을 먼저 검사(ratify-with-corrections 가 ratify 로 오인되지 않도록).
-  { c=clean($0); sub(/^(verdict|판정)[ \t:]*/,"",c)
-    if(c ~ /^ratify-with-corrections([ \t:-]|$)/) v="ratify-with-corrections"
-    else if(c ~ /^go-with-corrections([ \t:-]|$)/) v="go-with-corrections"
-    else if(c ~ /^no-go([ \t:-]|$)/) v="no-go"
-    else if(c ~ /^ratify([ \t:-]|$)/) v="ratify"
-    else if(c ~ /^reject([ \t:-]|$)/) v="reject"
-    else if(c ~ /^go([ \t:-]|$)/) v="go" }
-  END{ print v }' "$1"
+  # [2026-09-30 수정] 예전엔 "마지막 일치 줄"이 판정이었다 — 첫 줄 `VERDICT: reject` 뒤 본문에
+  #   "ratify-with-corrections를 줄 수 없는 이유" 같은 줄이 오면 reject가 덮여 게이트가 잘못 PASS했다.
+  #   또 종결자 집합 [ \t:-] 때문에 "`ratify-with-corrections`." 가 ratify 로 오분류됐다(24-ratify 실측).
+  #   이제 'VERDICT:'/'판정:' 라벨 줄의 첫 일치를 우선하고, 라벨 줄이 없을 때만 첫 단독 토큰 줄을 쓴다.
+  function tok(c){
+    if(c ~ /^ratify-with-corrections([^a-z-]|$)/) return "ratify-with-corrections"
+    if(c ~ /^go-with-corrections([^a-z-]|$)/) return "go-with-corrections"
+    if(c ~ /^no-go([^a-z-]|$)/) return "no-go"
+    if(c ~ /^ratify([^a-z-]|$)/) return "ratify"
+    if(c ~ /^reject([^a-z-]|$)/) return "reject"
+    if(c ~ /^go([^a-z-]|$)/) return "go"
+    return "" }
+  { c=clean($0); labeled=(c ~ /^(verdict|판정)[ \t]*:/); sub(/^(verdict|판정)[ \t:]*/,"",c)
+    t=tok(c)
+    if(t!=""){ if(labeled && lv=="") lv=t; if(fv=="") fv=t } }
+  END{ print (lv!="" ? lv : fv) }' "$1"
 }
 
 shopt -s nullglob

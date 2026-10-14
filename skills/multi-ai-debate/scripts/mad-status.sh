@@ -10,6 +10,6 @@ echo "=== session: $(mad_current_session) ==="
 echo "--- files ---"
 ls -1 "$sess" 2>/dev/null | sort || true
 echo "--- running external AI procs ---"
-pgrep -af 'codex exec|codex-aarch64|agy ' 2>/dev/null | grep -v 'mad-status' || echo "(none)"
+pgrep -af 'codex exec|agy |deepseek_agent|grok -m' 2>/dev/null | grep -v 'mad-status' || echo "(none)"
 echo "--- active uv/pytest/mypy (codex may be running checks) ---"
 pgrep -af 'uv run|pytest|mypy|ruff' 2>/dev/null | grep -v 'mad-status' || echo "(none)"

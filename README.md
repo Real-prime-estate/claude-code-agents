@@ -9,7 +9,7 @@
 | 스킬 | 설명 |
 |------|------|
 | `/think-deep` | 3개 에이전트(연구/논리/창의비판)가 파일 기반 다중 라운드 토론 후 수렴된 결론 생성 |
-| `/multi-ai-debate` | Claude(오케스트레이터)가 codex(GPT-5.5)·agy(Gemini)를 Bash로 구동해 파일 기반 토론·구현·검증. 할루시네이션 방지 게이트(Claim Ledger / spec-review / synthesis 비준 / red-team) 강제 |
+| `/multi-ai-debate` | Claude(오케스트레이터)가 외부 AI 4종(codex·agy·deepseek·grok)을 Bash로 구동하고 Claude Fable 독립 세션과 함께 파일 기반 토론·구현·검증. 할루시네이션 방지 게이트(Claim Ledger / spec-review / synthesis 비준 / red-team) 강제 |
 
 ### 코드 실행
 
@@ -25,7 +25,7 @@
 - `think-deep-critic` — 대안 제시, 기존 의견 비판, 프레임 전환
 
 **코드 실행 에이전트:**
-- `c-executor` — C11, Linux kernel 스타일
+- `c-executor` — C11, BSD KNF(style(9)) 계보
 - `cpp-executor` — C++20, Core Guidelines, CMake/clang-format/clang-tidy
 - `ts-executor` — TypeScript strict, 보수적 안전성 컨벤션 (순수 TS/라이브러리)
 - `next-react-executor` — Next.js App Router / React / TSX, strict TypeScript, ESLint
@@ -56,7 +56,7 @@ claude /plugin install --from-github Real-prime-estate/claude-code-agents
 /think-deep "Redis vs PostgreSQL pub/sub 비교"
 /think-deep --rounds 5 "마이크로서비스 vs 모놀리스"
 
-# 멀티-AI 협업 (codex + gemini 오케스트레이션)
+# 멀티-AI 협업 (codex·agy·deepseek·grok + Claude Fable 오케스트레이션)
 /multi-ai-debate "결제 모듈 설계 교차검증"
 
 # 코드 실행

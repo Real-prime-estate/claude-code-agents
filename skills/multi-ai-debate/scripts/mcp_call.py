@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """One-shot MCP stdio client for mad-dispatch (single file, stdlib only).
 
-Spawns an MCP stdio server (e.g. `codex mcp-server`, or the grok ACP→MCP
-bridge), performs the initialize handshake, calls one tool to completion, and
-prints the tool's final text result to stdout. Used by mad-dispatch.sh to drive
-codex (native MCP) and grok (ACP-bridged MCP) the same way.
+Spawns an MCP stdio server, performs the initialize handshake, calls one tool to
+completion, and prints the tool's final text result to stdout.
+
+NOTE (2026-09-15, 2026-10-14 갱신): 현재 로스터에서는 미사용이다 — codex는 `codex exec --json`
+직접 호출로 갔고(SKILL.md 연결 모델), grok은 2026-10-06 재합류했지만 `grok -p` CLI 직접 호출이다
+(ACP 브리지 경로는 구 CLI 426 거절로 미사용). 과거 codex 경로였던
+`codex mcp-server` 서브커맨드는 codex 0.154.0에서 제거됐다. 향후 MCP 전송을 쓰는
+멤버가 생기면 이 클라이언트를 재사용한다.
 
 The tool's `prompt` argument is read from --prompt-file (avoids arg-length /
 shell-escaping limits on the large Audit-Packet prompt). Extra tool arguments

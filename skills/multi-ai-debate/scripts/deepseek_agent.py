@@ -25,7 +25,9 @@ from pathlib import Path
 
 # OpenAI 호환 엔드포인트 — env로 교체 가능(GLM 등 타 provider 재사용).
 API = os.environ.get("AGENT_API_URL", "https://api.deepseek.com/v1/chat/completions")
-MODEL = os.environ.get("AGENT_MODEL") or os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")
+# ⚠ 옛 별칭 주의: deepseek-reasoner(구 R1)·deepseek-chat(구 V3)은 둘 다 deepseek-v4-**flash**로
+#   해석된다(2026-09-07 실측). 상위 티어를 쓰려면 반드시 deepseek-v4-pro를 명시할 것.
+MODEL = os.environ.get("AGENT_MODEL") or os.environ.get("DEEPSEEK_MODEL", "deepseek-flash")
 
 TOOLS = [
     {"type": "function", "function": {
@@ -96,10 +98,18 @@ def do_tool(root: Path, name: str, args: dict) -> str:
 
 def call_api(key: str, messages: list, tools: list) -> dict:
     extra = {}
-    # AGENT_THINKING=disabled → z.ai류 reasoning 억제(비용 절감). 미설정 시 provider 기본.
+    # AGENT_THINKING=disabled → reasoning 억제(비용 절감). 미설정 시 provider 기본.
     th = os.environ.get("AGENT_THINKING")
     if th:
         extra["thinking"] = {"type": th}
+    # AGENT_REASONING_EFFORT → DeepSeek V4의 추론 강도 다이얼.
+    #   실측 enum(2026-09-07): none|minimal|low|medium|high|xhigh|max.
+    #   R 계열은 V4로 통합됐고(별칭 deepseek-reasoner → deepseek-v4-flash), 추론은 별도 모델이
+    #   아니라 이 파라미터가 됐다. effort는 상한이지 하한이 아니다 — 쉬운 질문에선 값을 올려도
+    #   추론 토큰이 늘지 않는다(실측: minimal 54 vs xhigh 56 토큰).
+    eff = os.environ.get("AGENT_REASONING_EFFORT")
+    if eff:
+        extra["reasoning_effort"] = eff
     body = json.dumps({**extra, "model": MODEL, "messages": messages, "tools": tools,
                        "temperature": 0.3}).encode()
     req = urllib.request.Request(API, data=body, headers={

@@ -2,17 +2,19 @@
 # Dispatch a phase to an external AI, with bypass flags and a standard Audit Packet
 # prefix injected. The AI writes its output file itself (stdout is a fallback).
 #
-# Transport (2026-07-11):
-#   codex → `codex mcp-server` (native MCP stdio), driven by mcp_call.py.
-#   grok  → `grok -p` headless 원샷 (Windows에서 ACP stdio가 EOF까지 슬러프라 브릿지 불가;
-#           프롬프트는 파일 포인터 부트스트랩으로 전달. 브릿지는 POSIX용 보존).
+# Transport (2026-07-03):
+#   codex    → `codex exec --json` (CLI 직접 호출; usage 관측 + resume 가능).
+#   agy      → `agy --model … -p` (CLI).
+#   deepseek → deepseek_agent.py (chat completions + function calling 미니 에이전트).
+#   grok     → `grok -m grok-4.7 --reasoning-effort xhigh -p` CLI (2026-10-06 재합류). **일회용 복제본에서
+#              실행**한다 — grok 헤드리스는 권한 모드(plan·dontAsk 포함)와 무관하게 셸·파일 쓰기를 한다
+#              (2026-10-06 실측). 복제본에 쓴 산출 파일을 세션으로 옮기고, 없으면 stdout으로 폴백.
 #   agy   → `agy -p` CLI (unchanged; no MCP/ACP server mode).
-#   deepseek/glm → deepseek_agent.py (chat completions 미니 에이전트).
-# Both MCP agents run agentic sessions (own read/write/shell tools rooted at cwd),
-# so they still write the output file themselves per the Audit Packet.
+# Agentic sessions (own read/write/shell tools rooted at cwd) write the output file themselves
+# per the Audit Packet.
 #
 # Usage:
-#   mad-dispatch.sh <agy|codex|grok|deepseek|glm> <out_relpath> <prompt_file> [read_set_csv]
+#   mad-dispatch.sh <agy|codex|deepseek|grok> <out_relpath> <prompt_file> [read_set_csv]
 #     out_relpath : file the AI must write, relative to the current session dir
 #                   (e.g. 03-position-codex.md)
 #     prompt_file : path to a file containing the task body (avoids shell-escaping)
@@ -38,7 +40,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-ai="${1:?ai (agy|codex|grok|deepseek|glm)}"
+ai="${1:?ai (agy|codex|deepseek|grok)}"
 out="${2:?out_relpath}"
 pf="${3:?prompt_file}"
 extra="${4:-}"
@@ -48,9 +50,20 @@ proj="$(mad_project_dir)"
 ts="$(mad_current_session)"
 sess_rel="discussion/$ts"
 
+# 작업 맥락 인라인 동봉 (2026-07-26 사용자 규칙): 세션 00-topic.md 전문을 프롬프트에
+# 직접 포함 — read-set 참조만으로는 맥락 누락 위험(빈 스텁·미열람). MAD_CONTEXT_FILE로
+# override 가능. 오케스트레이터는 디스패치 전 00-topic.md에 맥락(목적·이력·수치·결정
+# 대상·대안)을 채울 의무가 있다(mad-new.sh 스텁 상태로 두지 말 것).
+ctx_file="$proj/$sess_rel/00-topic.md"
+[[ -n "${MAD_CONTEXT_FILE:-}" && -f "${MAD_CONTEXT_FILE}" ]] && ctx_file="$MAD_CONTEXT_FILE"
+ctx=""
+[[ -f "$ctx_file" ]] && ctx="$(cat "$ctx_file")"
+
 # Standard Audit Packet prefix (the failure-mode safeguards, baked in).
 read -r -d '' prefix <<EOF || true
 당신은 multi-AI 연구 토론의 참여자입니다. 오케스트레이터(claude)의 프롬프트를 그대로 믿지 말고 워크스페이스를 직접 조회해 전제를 감사하세요.
+
+$( [[ -n "$ctx" ]] && printf '[작업 맥락 — 세션 컨텍스트 전문(오케스트레이터 작성). 작업 이해의 기준선으로 쓰되, 수치·주장은 아래 Read Set 원문으로 재검증하라]\n%s\n' "$ctx" )
 
 [필수 Read Set — 작업 전에 직접 열어볼 것]
 - PROJECT.md
@@ -94,74 +107,98 @@ TIMEOUT="${MAD_DISPATCH_TIMEOUT:-420}"
 promptfile="$(mktemp -t mad-prompt.XXXXXX)"
 printf '%s' "$full" > "$promptfile"
 extrajson=""
-tmp_cleanup() { rm -f "$promptfile" ${extrajson:+"$extrajson"}; }
+grokclone=""
+tmp_cleanup() {
+  rm -f "$promptfile" ${extrajson:+"$extrajson"}
+  # grok 일회용 복제본은 휴지통으로 옮긴다(영구 삭제 대신 — 사용자 규율).
+  if [[ -n "$grokclone" && -d "$grokclone" && ! -L "$grokclone" ]]; then
+    local gparent; gparent="$(dirname "$grokclone")"
+    mv "$gparent" "$HOME/.Trash/$(basename "$gparent")" 2>/dev/null || true
+  fi
+}
 trap tmp_cleanup EXIT
 
 # Build the command into an array (no exec — the watchdog must supervise it).
-# codex/grok are driven as MCP servers via mcp_call.py; agy stays a CLI.
+# 전부 CLI/API 직접 호출로 구동한다(2026-09-07 방침). MCP 경로 미사용.
 cmd=()
 case "$ai" in
   agy)
-    # 모델: 3.5 Flash (High)가 기본(2026-07-06 A/B — 단문·실전 감사 모두 정확, 6.6s vs 3.1 Pro의
-    #   간헐 6분+ 지연. 구세대 Flash 오판 이력은 3.5에서 미관측). 3.1 Pro (High)는 fallback,
-    #   3.5 Pro 출시 시 재평가. MAD_AGY_MODEL로 override.
-    cmd=(agy --add-dir "$proj" --model "${MAD_AGY_MODEL:-Gemini 3.5 Flash (High)}" -p "$full" --dangerously-skip-permissions)
+    # 모델: Gemini 3.8 Flash (High). 2026-09-07 사용자 지시로 3.8 전환 + **최고 effort** 고정.
+    #   agy(Antigravity CLI)는 reasoning을 모델명에 내장한다(Low/Medium/High) — 별도 플래그 없음.
+    #   3.8 Flash는 agy 1.1.27+ 에만 존재(1.1.20에는 3.7까지). MAD_AGY_MODEL로 override.
+    # ⚠ `-p`(print) 모드는 **기본 타임아웃 5분**이다(`--print-timeout`, 실측 2026-09-08).
+    #   무거운 감사(파일 다수 열람 + 테스트 재현)는 5분을 넘겨 **로그도 산출도 없이 조용히 죽는다**.
+    #   두 번 연속 그렇게 잃었다 — PING은 정상이라 stall/usage-limit로 오진하기 쉽다.
+    #   MAD_DISPATCH_TIMEOUT(watchdog)과 별개이므로 반드시 함께 늘린다.
+    agytimeout="${MAD_AGY_PRINT_TIMEOUT:-${MAD_DISPATCH_TIMEOUT:-1800}s}"
+    [[ "$agytimeout" =~ ^[0-9]+$ ]] && agytimeout="${agytimeout}s"
+    cmd=(agy --add-dir "$proj" --model "${MAD_AGY_MODEL:-Gemini 3.8 Flash (High)}" \
+         --print-timeout "$agytimeout" -p "$full" --dangerously-skip-permissions)
     ;;
   codex)
-    # codex를 MCP 서버(`codex mcp-server`)로 구동하고 mcp_call.py로 `codex` 툴을 호출한다.
-    # 여전히 설정된 다운스트림 MCP 서버(vercel/figma 등)가 stall을 유발할 수 있으므로 MCP 없는
-    # 임시 CODEX_HOME(인증만 복사)으로 서버를 띄운다(2026-06-28 진단 유지). sandbox=danger-full-access
-    # + approval-policy=never로 기존 --dangerously-bypass-approvals-and-sandbox와 동등.
+    # **CLI 직접 호출이 기본 방침(2026-09-07 사용자 지시).** MCP 서버 경로는 쓰지 않는다.
+    #   근거: (a) `codex exec --json`이 턴마다 usage를 뱉어 **토큰 사용량을 정밀 관측**할 수 있다
+    #         (MCP 도구 결과에는 usage가 없다) — Plus 요금제 할당량 관리에 이게 결정적이다.
+    #     (b) `codex exec resume --last`로 **세션을 이어갈 수 있다** — MCP의 codex-reply와 동등.
+    #         "CLI는 매번 새 세션"은 사실이 아니다.
+    #     (c) 백그라운드 실행·폴링·타임아웃을 오케스트레이터가 직접 제어한다(MCP는 반환까지 블록).
+    #   MCP 서버(`codex mcp-server`)는 codex 0.154.0에서 **제거**됐다(2026-09-15). 위 세 이유로 원래도 미사용.
+    #
+    # 다운스트림 MCP 서버(vercel/figma/copilot 등) 인증 hang 회피를 위해 MCP 없는 임시
+    #   CODEX_HOME으로 구동한다(2026-06-28 진단 유지).
+    # 모델: gpt-6-astra. **CLI 0.153.4+ 필요** — 구 버전은 "requires a newer version of Codex" 400.
+    # reasoning: **기본 effort 사용**(사용자 지시) — model_reasoning_effort를 주입하지 않는다.
+    #   CODEX_HOME의 config.toml에도 effort를 고정하지 말 것. override는 MAD_CODEX_EFFORT로만.
     nh="${MAD_CODEX_HOME:-$HOME/.codex-nomcp}"
     mkdir -p "$nh"
     [[ -f "$nh/auth.json" ]] || { [[ -f "$HOME/.codex/auth.json" ]] && cp -f "$HOME/.codex/auth.json" "$nh/auth.json"; }
-    [[ -f "$nh/config.toml" ]] || printf 'model = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\n' > "$nh/config.toml"
-    # reasoning: gpt-5.6 enum = none/minimal/low/medium/high/xhigh (max 폐지, xhigh=최상단; 2026-07-10 실측). MAD_CODEX_EFFORT로 override.
-    extrajson="$(mktemp -t mad-extra.XXXXXX)"
-    printf '{"model":"gpt-5.6-sol","sandbox":"danger-full-access","approval-policy":"never","config":{"model_reasoning_effort":"%s"}}' "${MAD_CODEX_EFFORT:-high}" > "$extrajson"
-    cmd=(python3 "$SCRIPT_DIR/mcp_call.py" --tool codex --prompt-file "$promptfile" \
-      --cwd "$proj" --timeout "$TIMEOUT" --extra-json "$extrajson" \
-      -- env CODEX_HOME="$nh" codex mcp-server)
-    ;;
-  grok)
-    # grok의 ACP(`agent stdio`)는 Windows에서 stdin을 EOF까지 슬러프해 인터랙티브 왕복(sessionId
-    # 수신 후 prompt 전송)이 불가능하다(2026-07-11 진단: 응답이 stdin close 후에만 도착).
-    # → headless 원샷 `-p`로 구동한다(2026-06 라운드 검증 방식). Audit Packet은 커맨드라인
-    # 32K 한계를 피해 프롬프트 파일 경로만 주고 에이전트가 직접 Read하게 한다(-p도 에이전틱 —
-    # 파일 읽기/쓰기 수행). 모델은 기본(grok-4.5; 구 grok-build는 2026-07 라인업 개편으로 폐지).
-    # grok_acp_mcp_bridge.py(ACP→MCP)는 POSIX용으로 보존 — stdio 슬러프가 고쳐지면 복귀 후보.
-    gbin="${GROK_BIN:-}"
-    [[ -z "$gbin" ]] && gbin="$(command -v grok || true)"
-    [[ -z "$gbin" ]] && gbin="$HOME/.grok/bin/grok.exe"
-    gpf="$(cygpath -w "$promptfile" 2>/dev/null || printf '%s' "$promptfile")"
-    cmd=("$gbin" --cwd "$proj" --always-approve --effort "${GROK_EFFORT:-xhigh}" \
-      -p "지시 파일 \"$gpf\" 를 읽고 그 지시를 그대로 수행하라. 산출 파일 경로 등 모든 규칙은 그 파일 안에 있다.")
+    [[ -f "$nh/config.toml" ]] || printf 'model = "gpt-6-astra"\n' > "$nh/config.toml"
+    cxargs=(--skip-git-repo-check --json -m "${MAD_CODEX_MODEL:-gpt-6-astra}"
+            --sandbox danger-full-access -c approval_policy=never)
+    [[ -n "${MAD_CODEX_EFFORT:-}" ]] && cxargs+=(-c "model_reasoning_effort=${MAD_CODEX_EFFORT}")
+    # --json: JSONL 이벤트. turn.completed 에 usage(input/cached_input/output/reasoning_output)가 실린다.
+    #   mad-usage.sh 로 집계 가능. 산출 파일은 에이전트가 직접 쓰고 stdout은 폴백.
+    cmd=(env CODEX_HOME="$nh" codex exec "${cxargs[@]}" "$full")
     ;;
   deepseek)
-    # DeepSeek V4 Pro: 에이전틱 CLI 없음(Responses API 미지원 → codex 경로 불가, 2026-07-05 확인).
-    # deepseek_agent.py(chat completions + function calling 미니 에이전트)가 read/list/write/run
-    # 도구 루프를 제공. agy처럼 CLI 방식. 키는 ~/.deepseek/api_key 또는 $DEEPSEEK_API_KEY.
-    # 역할: 1M 컨텍스트 대용량 감사역 + codex quota 소진(exit 3) 시 1차 대타. 종량이나 초저가(토론당 ~$0.2).
+    # DeepSeek V4 Pro: 에이전틱 CLI 없음(2026-09-07 재확인 — deepseek/ds 실행파일 부재, Responses API
+    #   미지원이라 codex 경로 불가). deepseek_agent.py(chat completions + function calling 미니
+    #   에이전트)가 read/list/write/run 도구 루프를 제공한다. 키는 ~/.deepseek/api_key 또는 $DEEPSEEK_API_KEY.
+    # 모델: **deepseek-flash** (= DeepSeek-V4.1-Flash). 2026-09-22 A/B 실측으로 v4-pro에서 전환:
+    #   품질 동률(격리 4회 평균 9.4 vs 9.6, 모델 내 분산 ~1.4가 모델 간 차 0.2를 압도)인데
+    #   pro는 900초 기본 설정에서 **0/3 완주**(flash 3/3), 1회 15~40분 vs 3~8분, 가격 3~4배.
+    #   더 어려운 결함은 codex 등 최상위가 잡는다는 판단(사용자 지시 2026-09-22).
+    #   ⚠ pro로 되돌리려면 DEEPSEEK_MODEL=deepseek-v4-pro + MAD_DISPATCH_TIMEOUT>=2400 필수.
+    # 2026-09-22 실측 API 목록은 **둘뿐**:
+    #   deepseek-flash (= DeepSeek-V4.1-Flash, 신형) / deepseek-v4-pro (별도 유지).
+    #   ★구 별칭 deepseek-v4-flash·deepseek-v4-flash-vision-exp·deepseek-chat·deepseek-reasoner는
+    #     전부 deepseek-flash로 라우팅된다(응답 model 필드가 요청과 다른 이름을 돌려주는 것이 근거).
+    #     `deepseek-v4.1-flash`라는 id는 API가 거부한다 — 그 이름을 쓰지 말 것.
+    #   pro는 flash 대비 입력 4.4배·출력 3.3배 비싸고 비전 미지원. 교체 시 DEEPSEEK_MODEL로 override.
+    # reasoning: API enum = none/minimal/low/medium/high/xhigh/max (실측). 사용자 지시가
+    #   "최대에서 한 단계 아래"이므로 **xhigh** 고정. MAD_DEEPSEEK_EFFORT로 override.
+    export AGENT_REASONING_EFFORT="${MAD_DEEPSEEK_EFFORT:-xhigh}"
     cmd=(python3 "$SCRIPT_DIR/deepseek_agent.py" --cwd "$proj" --prompt-file "$promptfile" \
       --max-turns "${MAD_DEEPSEEK_TURNS:-40}")
     ;;
-  glm)
-    # GLM-5.2 (z.ai 종량 API, OpenAI 호환): deepseek_agent.py를 env 주입으로 재사용
-    # (AGENT_API_URL/AGENT_MODEL/AGENT_API_KEY, 2026-07-06 스모크 통과 — ping·function
-    # calling·에이전트 루프 전부 정상). 키는 ~/.zai/api_key. reasoning 모델(사고 노출).
-    # 주의: Coding Plan(구독) 키는 공식 도구 전용 약관 — 여기엔 종량 키만 사용.
-    export AGENT_API_URL="https://api.z.ai/api/paas/v4/chat/completions"
-    export AGENT_MODEL="${MAD_GLM_MODEL:-glm-5.2}"
-    # 역할별 정착 구성(2026-07-06 실측): ratify·경량 감사는 MAD_GLM_THINKING=disabled(~$0.15),
-    # verify·재현 실행은 thinking on(기본) + MAD_DISPATCH_TIMEOUT=1500+ + MAD_GLM_TURNS=60(~$0.5).
-    [[ -n "${MAD_GLM_THINKING:-}" ]] && export AGENT_THINKING="$MAD_GLM_THINKING"
-    AGENT_API_KEY="$(cat "$HOME/.zai/api_key" 2>/dev/null || true)"
-    export AGENT_API_KEY
-    [[ -n "$AGENT_API_KEY" ]] || mad_die "no z.ai key at ~/.zai/api_key"
-    cmd=(python3 "$SCRIPT_DIR/deepseek_agent.py" --cwd "$proj" --prompt-file "$promptfile" \
-      --max-turns "${MAD_GLM_TURNS:-40}")
+  grok)
+    # 2026-10-06 사용자 지시로 재합류: "multi-ai-debate에 grok을 포함시키자. 없는 때가 있다면 제외하고 진행".
+    #   모델·effort = "가장 최근 모델과 가장 높은 effort": grok-4.7(`grok models` 기본·최신) + xhigh
+    #   (CLI 허용값 xhigh/high/medium/low — `max`는 "unknown effort level"로 거절). MAD_GROK_MODEL·MAD_GROK_EFFORT로 override.
+    # 전송 = CLI 직접 호출. ⚠ Claude MCP `mcp__grok__grok` 브리지는 세션 시작 때 띄운 구 CLI(1.0.5)를 물고 있어
+    #   426 "CLI version outdated"로 거절된다(2026-10-06 실측, 설치본은 1.0.46) — 쓰지 않는다.
+    # ⚠ 격리: grok 헤드리스는 --permission-mode plan·dontAsk에서도 셸 실행·파일 쓰기를 한다(2026-10-06 실측).
+    #   과거 유령 커밋 이력도 있다. 그래서 **프로젝트의 일회용 APFS 복제본(.git 비활성)을 cwd로** 돌린다.
+    #   산출은 복제본 안의 같은 상대 경로에 쓰게 두고, 끝나면 그 파일을 실제 세션으로 옮긴다(아래 루프).
+    command -v grok >/dev/null 2>&1 || mad_die "grok CLI not found (~/.grok/bin/grok)"
+    grokclone="$(mktemp -d -t mad-grok.XXXXXX)/proj"
+    cp -cR "$proj" "$grokclone" 2>/dev/null || cp -R "$proj" "$grokclone"
+    [[ -L "$grokclone" ]] && mad_die "grok clone is a symlink — refusing"
+    [[ -e "$grokclone/.git" ]] && mv "$grokclone/.git" "$grokclone/.git.disabled"
+    cmd=(grok -m "${MAD_GROK_MODEL:-grok-4.7}" --reasoning-effort "${MAD_GROK_EFFORT:-xhigh}" \
+         --cwd "$grokclone" --permission-mode bypassPermissions --prompt-file "$promptfile")
     ;;
-  *) mad_die "unknown ai: $ai (use agy|codex|grok|deepseek|glm)";;
+  *) mad_die "unknown ai: $ai (use agy|codex|deepseek|grok)";;
 esac
 
 # --- Watchdog + auto-retry supervisor -------------------------------------------------
@@ -206,7 +243,11 @@ while [[ "$attempt" -le "$RETRIES" ]]; do
     sleep 5
   done
   wait "$pid" 2>/dev/null; rc=$?
-  # codex/grok(MCP)는 mcp_call.py가 에이전트 최종 텍스트를 stdout으로 낸다. 에이전트가 산출 파일을
+  # grok은 일회용 복제본 안에 산출을 쓴다 — 실제 세션으로 옮긴다(아래 stdout 폴백보다 먼저).
+  if [[ "$ai" == "grok" && -z "$killed" && "$rc" -eq 0 && -s "$grokclone/$sess_rel/$out" ]]; then
+    cp "$grokclone/$sess_rel/$out" "$outfile"
+  fi
+  # 전 참여자가 CLI/API 직접 호출이다. 에이전트가 산출 파일을
   # 직접 쓰는 게 1차 경로지만, 안 썼으면 그 stdout을 파일 내용으로 폴백한다(rc=0일 때만 = 깨끗한 텍스트).
   if [[ "$ai" != "agy" && -z "$killed" && "$rc" -eq 0 && ! -s "$outfile" && -s "$log" ]]; then
     cp "$log" "$outfile"

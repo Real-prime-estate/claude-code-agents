@@ -6,7 +6,7 @@
 
 언어별 실행 에이전트(`*-executor`)가 코드 작성·자체 리뷰 시 정본으로 참조하는 컨벤션.
 
-- [C](coding-conventions/c.md) — Linux kernel 스타일 + C11
+- [C](coding-conventions/c.md) — BSD KNF(style(9)) 계보 + C11
 - [C++](coding-conventions/cpp.md) — Core Guidelines + C++20, CMake/clang-format/clang-tidy
 - [TypeScript](coding-conventions/typescript.md) — strict 전부 켠 보수적 안전성, unsoundness/JS 함정 차단
 - [Next.js / React / TSX](coding-conventions/next-react.md) — App Router 현실 반영, typescript.md 위에 얹음
