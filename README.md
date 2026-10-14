@@ -26,6 +26,7 @@
 
 **코드 실행 에이전트:**
 - `c-executor` — C11, BSD KNF(style(9)) 계보
+- `rust-executor` — Rust stable·edition 2024, BSD KNF C 개발자가 읽히는 Rust(`?` 금지·`return (값);`·선두 선언·unsafe 금지), fmt/clippy/test 게이트
 - `cpp-executor` — C++20, Core Guidelines, CMake/clang-format/clang-tidy
 - `ts-executor` — TypeScript strict, 보수적 안전성 컨벤션 (순수 TS/라이브러리)
 - `next-react-executor` — Next.js App Router / React / TSX, strict TypeScript, ESLint
@@ -35,7 +36,7 @@
 
 ## 메모리 (memory/)
 
-작업 방식 지침(feedback)과 언어별 코딩 컨벤션을 추린 참조용 메모리. executor 에이전트가 코드 작성·리뷰 시 정본으로 참조하는 컨벤션 7종과, 사용자가 확정한 작업 방식 지침 11종이 들어 있다. 자세한 목록은 [memory/MEMORY.md](memory/MEMORY.md).
+작업 방식 지침(feedback)과 언어별 코딩 컨벤션을 추린 참조용 메모리. executor 에이전트가 코드 작성·리뷰 시 정본으로 참조하는 컨벤션 8종과, 사용자가 확정한 작업 방식 지침 11종이 들어 있다. 자세한 목록은 [memory/MEMORY.md](memory/MEMORY.md).
 
 ## 설치
 
@@ -69,11 +70,11 @@ claude /plugin install --from-github Real-prime-estate/claude-code-agents
 ```
 .claude-plugin/
   plugin.json          # 플러그인 메타데이터
-agents/                # 에이전트 정의 (10개)
-skills/                # 스킬 정의 (3개: code, think-deep, multi-ai-debate)
+agents/                # 에이전트 정의 (11개)
+skills/                # 스킬 정의 (4개: code, think-deep, multi-ai-debate, rust-knf)
 memory/
   MEMORY.md            # 메모리 인덱스
-  coding-conventions/  # 언어별 코딩 컨벤션 (7개)
+  coding-conventions/  # 언어별 코딩 컨벤션 (8개)
   feedback/            # 작업 방식 지침 (11개)
 ```
 
