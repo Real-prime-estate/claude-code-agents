@@ -25,7 +25,7 @@
 - `think-deep-critic` — 대안 제시, 기존 의견 비판, 프레임 전환
 
 **코드 실행 에이전트:**
-- `c-executor` — C11, BSD KNF(style(9)) 계보
+- `c-executor` — C11, V7/K&R → BSD KNF(style(9)) 계보, 짧은 이름·구조체 멤버 접두사
 - `rust-executor` — Rust stable·edition 2024, BSD KNF C 개발자가 읽히는 Rust(`?` 금지·`return (값);`·선두 선언·unsafe 금지), fmt/clippy/test 게이트
 - `cpp-executor` — C++20, Core Guidelines, CMake/clang-format/clang-tidy
 - `ts-executor` — TypeScript strict, 보수적 안전성 컨벤션 (순수 TS/라이브러리)

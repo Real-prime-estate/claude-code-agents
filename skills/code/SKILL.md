@@ -32,7 +32,7 @@ metadata:
 
 | subagent_type | 대상 | 모델 | 주요 용도 |
 |---------------|------|------|----------|
-| `agents:c-executor` | C 코드 | opus | 일반 C |
+| `agents:c-executor` | C 코드 | opus | 일반 C (C11, V7/K&R → BSD KNF 계보) |
 | `agents:cpp-executor` | C++ 코드 | opus | 일반 C++ (C++20, Core Guidelines) |
 | `agents:rust-executor` | Rust 코드 | opus | 일반 Rust (stable·edition 2024, BSD KNF 계보 규약) |
 | `agents:ts-executor` | TypeScript 코드 (순수/라이브러리) | opus | 런타임 독립 TS, SDK, 도메인 로직 |

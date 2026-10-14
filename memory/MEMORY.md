@@ -6,7 +6,7 @@
 
 언어별 실행 에이전트(`*-executor`)가 코드 작성·자체 리뷰 시 정본으로 참조하는 컨벤션.
 
-- [C](coding-conventions/c.md) — BSD KNF(style(9)) 계보 + C11
+- [C](coding-conventions/c.md) — V7/K&R → BSD KNF(style(9)) 계보 + C11, 짧은 이름·구조체 멤버 접두사
 - [Rust](coding-conventions/rust.md) — stable·edition 2024, BSD KNF C 개발자가 읽히는 명시적 Rust(2026-10-08 확정)
 - [C++](coding-conventions/cpp.md) — Core Guidelines + C++20, CMake/clang-format/clang-tidy
 - [TypeScript](coding-conventions/typescript.md) — strict 전부 켠 보수적 안전성, unsoundness/JS 함정 차단
