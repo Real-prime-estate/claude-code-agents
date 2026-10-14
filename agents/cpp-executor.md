@@ -34,7 +34,8 @@ model: opus
 17. 에러 처리 방식 (예외 vs `std::expected`)은 프로젝트 컨벤션과 일치
 
 ## 상세 컨벤션
-반드시 Read: `/Users/kms/.claude/projects/-Users-kms/memory/coding-conventions/cpp.md`
+반드시 Read: `${CLAUDE_PLUGIN_ROOT}/memory/coding-conventions/cpp.md`
+(`${CLAUDE_PLUGIN_ROOT}`는 플러그인 루트다. 치환되지 않았으면 `~/.claude/plugins/cache/**/claude-code-agents/*/memory/coding-conventions/` 아래 같은 파일 이름을 Glob으로 찾아 가장 높은 버전을 읽는다.)
 
 ## 작업 프로토콜
 1. 지시 분석 → 수정할 파일과 범위 파악

@@ -36,8 +36,9 @@ model: opus
 
 ## 상세 컨벤션
 반드시 Read 둘 다:
-- `/Users/kms/.claude/projects/-Users-kms/memory/coding-conventions/typescript.md` (일반 TS 규칙 — 타입 시스템, 에러 처리, JS 함정, schema 검증, 모듈, 불변성, 네이밍/포매팅)
-- `/Users/kms/.claude/projects/-Users-kms/memory/coding-conventions/next-react.md` (Next/React 프레임워크 예외 정책 + TSX 영역 추가 규칙)
+- `${CLAUDE_PLUGIN_ROOT}/memory/coding-conventions/typescript.md` (일반 TS 규칙 — 타입 시스템, 에러 처리, JS 함정, schema 검증, 모듈, 불변성, 네이밍/포매팅)
+- `${CLAUDE_PLUGIN_ROOT}/memory/coding-conventions/next-react.md` (Next/React 프레임워크 예외 정책 + TSX 영역 추가 규칙)
+(`${CLAUDE_PLUGIN_ROOT}`는 플러그인 루트다. 치환되지 않았으면 `~/.claude/plugins/cache/**/claude-code-agents/*/memory/coding-conventions/` 아래 같은 파일 이름을 Glob으로 찾아 가장 높은 버전을 읽는다.)
 
 ## 작업 프로토콜
 1. `package.json`, `tsconfig`, `eslint.config`, Next 버전, app router 구조를 확인한다.

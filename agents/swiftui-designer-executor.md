@@ -40,8 +40,9 @@ model: opus
 
 ## 상세 컨벤션
 반드시 Read 둘 다:
-- `/Users/kms/.claude/projects/-Users-kms/memory/coding-conventions/swift.md` (일반 Swift 규칙)
-- `/Users/kms/.claude/projects/-Users-kms/memory/coding-conventions/swiftui.md` (SwiftUI 특화 — 디자인 토큰, 접근성, 애니메이션)
+- `${CLAUDE_PLUGIN_ROOT}/memory/coding-conventions/swift.md` (일반 Swift 규칙)
+- `${CLAUDE_PLUGIN_ROOT}/memory/coding-conventions/swiftui.md` (SwiftUI 특화 — 디자인 토큰, 접근성, 애니메이션)
+(`${CLAUDE_PLUGIN_ROOT}`는 플러그인 루트다. 치환되지 않았으면 `~/.claude/plugins/cache/**/claude-code-agents/*/memory/coding-conventions/` 아래 같은 파일 이름을 Glob으로 찾아 가장 높은 버전을 읽는다.)
 
 ## 작업 프로토콜
 

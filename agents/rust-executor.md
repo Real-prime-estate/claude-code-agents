@@ -34,8 +34,8 @@ model: opus
 17. 시험 코드도 같은 규칙(선두 선언·명시형 호출·return 괄호). 완화는 `unwrap`·`expect`·`panic`·인덱싱만
 
 ## 상세 컨벤션
-반드시 Read: `/Users/kms/.claude/skills/rust-knf/conventions/rust.md`
-(같은 파일이 `/Users/kms/.claude/projects/-Users-kms/memory/coding-conventions/rust.md` 심볼릭 링크로도 열린다.)
+반드시 Read: `${CLAUDE_PLUGIN_ROOT}/memory/coding-conventions/rust.md`
+(`${CLAUDE_PLUGIN_ROOT}`는 플러그인 루트다. 치환되지 않았으면 `~/.claude/plugins/cache/**/claude-code-agents/*/memory/coding-conventions/` 아래 같은 파일 이름을 Glob으로 찾아 가장 높은 버전을 읽는다.)
 
 ## 작업 프로토콜
 1. 지시 분석 → 수정할 파일과 범위 파악
