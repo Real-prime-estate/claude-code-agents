@@ -34,6 +34,7 @@ metadata:
 |---------------|------|------|----------|
 | `agents:c-executor` | C 코드 | opus | 일반 C |
 | `agents:cpp-executor` | C++ 코드 | opus | 일반 C++ (C++20, Core Guidelines) |
+| `agents:rust-executor` | Rust 코드 | opus | 일반 Rust (stable·edition 2024, BSD KNF 계보 규약) |
 | `agents:ts-executor` | TypeScript 코드 (순수/라이브러리) | opus | 런타임 독립 TS, SDK, 도메인 로직 |
 | `agents:next-react-executor` | Next.js/React/TSX | opus | App Router, component, hooks, UI state |
 | `agents:py-executor` | Python 코드 | opus | 일반 Python |
@@ -45,7 +46,7 @@ metadata:
 사용자 입력: `$ARGUMENTS`
 
 옵션:
-- `--lang <언어>`: 언어 명시 (c, cpp, ts, next-react, py, swift, swiftui)
+- `--lang <언어>`: 언어 명시 (c, cpp, rust, ts, next-react, py, swift, swiftui)
 - `--from-debate <경로>`: think-deep 또는 design-think report.md에서 권고 구현
 - `--review-only`: 코드 수정 없이 컨벤션 리뷰만
 - 나머지: 코딩 지시
@@ -59,6 +60,7 @@ metadata:
    - `swiftui` → SwiftUI View (swiftui-designer-executor)
    - `c` → C (c-executor)
    - `cpp` → C++ (cpp-executor)
+   - `rust` → Rust (rust-executor)
    - 기타 → 해당 executor
 
 2. **명시 없으면 작업 디렉토리 스캔**:
@@ -68,6 +70,7 @@ metadata:
    *.c/.h 단독 (C++ 확장자 없음) → C
    CMakeLists.txt              → 내용 확인 (project(... CXX) 또는 LANGUAGES CXX이면 C++,
                                   LANGUAGES C 단독이면 C, 둘 다면 소스 확장자 다수결)
+   Cargo.toml, *.rs            → Rust (rust-executor)
    next.config.*, app/·pages/ + react 의존성, *.tsx → Next.js/React (next-react-executor)
    package.json, tsconfig.json (순수 TS) → TypeScript (ts-executor)
    pyproject.toml, uv.lock     → Python
@@ -97,6 +100,7 @@ metadata:
    - 불분명하면 → 사용자에게 질문
 
 5. **복수 언어 감지** → 지시 내용으로 해당 언어 선택. 불분명하면 질문
+   - Cargo 크레이트에 C/C++ 소스가 섞인 경우(`build.rs` + `cc` 등) → 대상 파일 확장자로 결정 (`.rs` → rust-executor, `.c`/`.h` → c-executor, C++ 확장자 → cpp-executor)
 
 6. **감지 실패** → 사용자에게 질문
 
