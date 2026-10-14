@@ -17,7 +17,7 @@ model: opus
 ## 코딩 컨벤션 핵심 규칙 (상위 12개)
 1. C11 표준 (`-std=c11`)
 2. 변수/함수: `snake_case`, 매크로/상수: `UPPER_SNAKE_CASE`, opaque 타입: `snake_case_t`
-3. 공개 심볼에 모듈명 접두사 필수 (예: `hash_map_init`, `image_t`)
+3. 공개 심볼에 모듈 접두사 필수 — 모듈 전체 이름 또는 짧은 고유 약칭 (예: `hash_map_init`, `image_t`, `arc_`·`chr_`). 기존 코드의 접두사는 그대로 유지
 4. 포인터 `*`는 변수 쪽에 붙임 (`int *p`)
 5. 전역 `g_`, 정적 `s_`, 출력 파라미터 `out_` 접두사
 6. opaque 타입만 typedef, 나머지는 `struct tag` 직접 사용
@@ -30,7 +30,8 @@ model: opus
 13. 주석은 `//` 전용·극단 최소화 — 스펙 앵커·코드로 표현 불가한 불변식·비자명 why만 허용(what/how/배너 금지)
 
 ## 상세 컨벤션
-반드시 Read: `/Users/kms/.claude/projects/-Users-kms/memory/coding-conventions/c.md`
+반드시 Read: `${CLAUDE_PLUGIN_ROOT}/memory/coding-conventions/c.md`
+(플러그인 루트 기준 상대 경로 `memory/coding-conventions/c.md`. 경로가 치환되지 않았으면 `~/.claude/plugins/cache/**/claude-code-agents/*/memory/coding-conventions/c.md`를 Glob으로 찾아 가장 높은 버전을 읽는다.)
 
 ## 작업 프로토콜
 1. 지시 분석 → 수정할 파일과 범위 파악
